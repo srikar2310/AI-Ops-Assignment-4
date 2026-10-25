@@ -1,0 +1,7 @@
+streamlit>=1.45
+transformers>=4.40
+torch
+pillow
+pandas
+prometheus_client>=0.20
+psutil
