@@ -123,4 +123,4 @@ multi-series plots, "Title · subtitle" titles, and a story in each panel's desc
 ## AI attribution
 
 `monitoring/prometheus.yml`, `monitoring/alert_rules.yml`, `grafana/dashboard.json` and `PROMQL.md` were generated
-with Claude (Anthropic). Prompt: *"give the required yml and prom ql files according to the given logic"* and *"give the required json file for the grafana dashboard"*. The logic of every query is written out in `PROMQL.md`. The remaining files were given as the context to these prompts.
+with Claude (Anthropic). Prompt: *"give the required yml and prom ql files according to the given logic"* and *"give the required json file for the grafana dashboard"*. The logic of every query is written out in `PROMQL.md`. The remaining files were given as the context to these prompts. I had also used claude for the video script.
