@@ -1,0 +1,118 @@
+# AI attribution (Code of Conduct): the PromQL below was generated with Claude
+# (Anthropic). Prompt used:
+#   "give the remaining required files for node exporter, prometheus.yaml and
+#    grafana dashboard"
+# Each rule's logic is explained in the comment above it.
+
+groups:
+  - name: caption-app-availability
+    rules:
+      # up == 0 means Prometheus' last scrape of the app's /metrics failed.
+      - alert: CaptionAppDown
+        expr: up{job="caption_app"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Captioning app /metrics is unreachable"
+          description: "Prometheus could not scrape {{ $labels.instance }} for 30 s. Is Streamlit running?"
+
+      - alert: NodeExporterDown
+        expr: up{job="node"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "node_exporter is unreachable"
+          description: "No host metrics from {{ $labels.instance }} for 30 s."
+
+      # Gauge is set to 1 inside load_model(); 0 means no session has loaded it yet.
+      - alert: ModelNotLoaded
+        expr: caption_model_loaded == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Captioning model not loaded"
+          description: "caption_model_loaded has been 0 for 5 min (open the app once to load it)."
+
+  - name: caption-app-performance
+    rules:
+      # p95 latency: interpolate the 95th percentile inside the cumulative
+      # histogram buckets, using per-second bucket growth over the last minute.
+      - alert: HighInferenceLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(caption_inference_duration_seconds_bucket[1m]))
+          ) > 5
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 inference latency above 5 s"
+          description: "p95 = {{ $value | humanizeDuration }} over the last minute."
+
+      # Error ratio = failed images / all images handled, over 2 min.
+      - alert: HighImageErrorRatio
+        expr: |
+          sum(rate(caption_images_processed_total{status="error"}[2m]))
+            /
+          sum(rate(caption_images_processed_total[2m]))
+          > 0.10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 10% of images are failing"
+          description: "Error ratio is {{ $value | humanizePercentage }}."
+
+      # Queue is non-empty but has not moved for 2 min -> a bulk job is stuck.
+      - alert: BulkQueueStuck
+        expr: caption_bulk_queue_remaining > 0 and changes(caption_bulk_queue_remaining[2m]) == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Bulk queue is not draining"
+          description: "{{ $value }} images queued with no progress for 2 min."
+
+  - name: host-resources
+    rules:
+      # CPU busy % = 100 * (1 - average idle fraction across cores).
+      - alert: HostCpuSaturated
+        expr: 100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[1m]))) > 90
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host CPU above 90% for 2 min"
+          description: "CPU busy = {{ $value | printf \"%.0f\" }}%."
+
+      # Memory used fraction = 1 - available / total.
+      - alert: HostMemoryHigh
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 0.90
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host memory above 90%"
+          description: "Memory used = {{ $value | humanizePercentage }}."
+
+      - alert: AppMemoryHigh
+        expr: caption_process_resident_memory_bytes > 3e9
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "App process using more than 3 GB RSS"
+          description: "RSS = {{ $value | humanize1024 }}B."
+
+      # Root filesystem used fraction = 1 - avail / size.
+      - alert: DiskSpaceLow
+        expr: (1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) > 0.90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Root filesystem above 90% full"
+          description: "Disk used = {{ $value | humanizePercentage }}."

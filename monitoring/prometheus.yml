@@ -1,0 +1,40 @@
+# AI attribution (Code of Conduct): this file and alert_rules.yml were generated
+# with Claude (Anthropic). Prompt used:
+#   "give the remaining required files for node exporter, prometheus.yaml and
+#    grafana dashboard"
+# No regex is used in this file. PromQL in alert_rules.yml carries its own notes.
+
+global:
+  scrape_interval: 5s        # matches the 5 s Grafana refresh
+  scrape_timeout: 4s         # must be < scrape_interval
+  evaluation_interval: 5s
+  external_labels:
+    monitor: da3408-a4
+
+rule_files:
+  - alert_rules.yml
+
+scrape_configs:
+  # app and node share the `service` label so application and host series can be
+  # lined up when correlating bulk uploads with hardware usage.
+  - job_name: caption_app
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["localhost:8000"]
+        labels:
+          service: image-captioning
+          component: application
+
+  - job_name: node
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["localhost:9100"]
+        labels:
+          service: image-captioning
+          component: host
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          component: monitoring
